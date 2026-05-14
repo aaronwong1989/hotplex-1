@@ -506,6 +506,7 @@ HotPlex 通过 `fsnotify` 监听配置文件变更，支持运行时热更新。
 | `admin.requests_per_sec` | Admin API 速率限制 |
 | `admin.burst` | Admin API 突发量 |
 | `admin.tokens` | Admin Token 列表 |
+| `admin.allowed_cidrs` | IP 白名单 CIDR 列表 |
 
 ### 4.2 静态字段（需重启）
 

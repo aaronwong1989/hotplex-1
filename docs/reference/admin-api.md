@@ -49,7 +49,7 @@ admin:
 | `stats:read` | - | - | 🟢 Read | - | - | - | `GET /admin/stats`<br>`GET /admin/metrics` |
 | `config:read` | - | - | - | 🟢 Read | - | - | `POST /admin/config/validate` |
 | `config:write` | - | - | - | 🟠 Write | - | - | `POST /admin/config/rollback` |
-| `admin:read` | - | - | - | - | 🟢 Read | 🟢 Read | `GET /admin/logs`<br>`GET /admin/debug/...`<br>`GET /api/cron/jobs` |
+| `admin:read` | - | - | - | - | 🟢 Read | 🟢 Read | `GET /admin/logs`<br>`GET /admin/debug/...`<br>`GET /admin/bots`<br>`GET /api/cron/jobs` |
 | `admin:write` | - | - | - | - | - | 🟠 Write | `POST/PATCH/DELETE /api/cron/jobs`<br>`POST /api/cron/jobs/{id}/run` |
 
 > 💡 **图例**：🟢 **Read** (只读查询) | 🟠 **Write** (状态变更/操作) | 🔴 **Delete** (物理删除)
@@ -161,6 +161,27 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 | GET | `/api/cron/jobs/{id}/runs` | `admin:read` | 执行历史 |
 
 Cron 未启用时返回 `503 Service Unavailable`。
+
+### Bot 状态
+
+| 方法 | 路径 | Scope | 说明 |
+|------|------|-------|------|
+| GET | `/admin/bots` | `admin:read` | 列出所有注册 Bot |
+| GET | `/admin/bots/{name}` | `admin:read` | 单个 Bot 详情 |
+
+**GET /admin/bots** — 返回所有活跃 Bot 列表，每个条目包含 `name`（Bot 名称）、`platform`（slack/feishu）、`bot_id`（平台 Bot ID）、`status`（连接状态）、`connected_at`（连接时间）、`soul`（人格标识）、`worker_type`（Worker 类型）。
+
+**GET /admin/bots/{name}`** — 按名称查询 Bot 详情。Bot 未找到时返回 `404`。
+
+```bash
+# 列出所有 Bot
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:9999/admin/bots
+
+# 查询单个 Bot
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:9999/admin/bots/my-bot
+```
 
 ## Gateway API 端点
 
