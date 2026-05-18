@@ -80,8 +80,9 @@ type crashHistory struct {
 }
 
 const (
-	crashLoopMax    = 3               // max consecutive crashes before abort
-	crashLoopWindow = 5 * time.Minute // window for counting consecutive crashes
+	crashLoopMax    = 3                // max consecutive crashes before abort
+	crashLoopWindow = 5 * time.Minute  // window for counting consecutive crashes
+	resumeTimeout   = 60 * time.Second // max time for Worker.Resume(); prevents indefinite blocking
 )
 
 // NewBridge creates a new bridge.
@@ -249,7 +250,10 @@ func (b *Bridge) resumeWithOpts(ctx context.Context, id, workDir string, opts fo
 				opts.resumed = false
 				return nil
 			}
-			if err := w.Resume(ctx, info); err != nil {
+			resumeCtx, resumeCancel := context.WithTimeout(ctx, resumeTimeout)
+			err := w.Resume(resumeCtx, info)
+			resumeCancel()
+			if err != nil {
 				return fmt.Errorf("bridge: resume start: %w", err)
 			}
 			return nil

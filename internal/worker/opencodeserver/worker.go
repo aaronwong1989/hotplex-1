@@ -268,26 +268,30 @@ func (w *Worker) Resume(ctx context.Context, session worker.SessionInfo) error {
 		return err
 	}
 
+	w.Log.Debug("opencodeserver: resume step 1 - acquiring server")
 	if err := w.acquireServer(ctx); err != nil {
 		return err
 	}
+	w.Log.Debug("opencodeserver: resume step 2 - server acquired", "addr", w.httpAddr)
 
 	// Try to reuse the OCS-internal session if we have one from a previous Start.
 	ocsSessionID := session.WorkerSessionID
 	if ocsSessionID != "" {
-		// Verify the OCS session still exists.
+		w.Log.Debug("opencodeserver: resume step 3 - checking session existence", "ocs_session_id", ocsSessionID)
 		if w.ocsSessionExists(ctx, ocsSessionID) {
 			w.Log.Info("opencodeserver: resuming existing OCS session",
 				"ocs_session_id", ocsSessionID, "hotplex_session_id", session.SessionID)
 			w.initSessionConn(ctx, ocsSessionID, session)
 			w.startSSE(ocsSessionID)
+			w.Log.Debug("opencodeserver: resume completed (reused session)")
 			return nil
 		}
 		w.Log.Info("opencodeserver: OCS session not found, creating fresh",
 			"stale_ocs_session_id", ocsSessionID, "hotplex_session_id", session.SessionID)
 	}
 
-	// No valid OCS session — create a new one (conversation context is lost).
+	// No valid OCS session - create a new one (conversation context is lost).
+	w.Log.Debug("opencodeserver: resume step 3 - creating fresh session", "dir", session.ProjectDir)
 	newSessionID, err := w.createSession(ctx, session.ProjectDir)
 	if err != nil {
 		w.releaseOnce.Do(func() { w.singleton.Release() })
@@ -296,6 +300,7 @@ func (w *Worker) Resume(ctx context.Context, session worker.SessionInfo) error {
 
 	w.initSessionConn(ctx, newSessionID, session)
 	w.startSSE(newSessionID)
+	w.Log.Debug("opencodeserver: resume completed (fresh session)")
 	return nil
 }
 
