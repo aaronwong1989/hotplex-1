@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.15.0] - 2026-05-18
+
+### Summary
+
+v1.15.0 是一次 minor 版本更新，聚焦于 **OCS V2 Converter 架构升级** 和 **Phrases 话术定制系统**。OCS Worker 引入独立 Converter 结构体替代 V1 消息解析，支持结构化权限/问答事件、reasoning 阶段检测、model/schema/variant 透传；Claude Code Worker 新增 4 项 Session Flags 映射（--continue/--fork-session/--resume-session-at/--settings）；飞书消息适配器完成 Welcome Card 可配置化和 Persona Phrases 系统；Slack 修复 Reasoning 状态映射。
+
+### Added
+
+- **Worker**: OCS V2 Converter architecture — standalone `Converter` struct with typed event parsing, per-session `turnState` tracking, and structured tool call/result conversion, replacing V1 `message.part.delta/updated` parsing. (#434)
+- **Worker**: Structured permission/question events — direct `PermissionRequestData`/`QuestionRequestData` conversion replacing raw passthrough, with Feishu elicitation explicit accept/decline keywords. (#443)
+- **Worker**: Reasoning phase detection — bracket `field="text"` deltas between reasoning lifecycle events to prevent inner monologue leakage in OCS 1.15+ unified `message.part.delta`. (#437)
+- **Worker**: Model/JSONSchema/variant passing — bridge 6 capability gaps between OCS Worker and OpenCode Server (AllowedModels, JSONSchema, variant/reasoning effort, reasoning events, experimental event system, image modality). (#434)
+- **Worker**: Claude Code session flags — map `ContinueSession`/`ForkSession`/`ResumeSessionAt`/`ConfigEnv` to `--continue`, `--fork-session`, `--resume-session-at`, `--settings` CLI flags. (#444)
+- **Messaging**: Configurable welcome card via phrases — extract hardcoded capabilities, quick commands, and closing line into 3 phrase categories with per-bot customization. (#441)
+- **Messaging**: Persona phrases — `persona` and `closings` categories for placeholder status lines and random sign-off on turn completion, with abort-path omission. (#438)
+
+### Changed
+
+- **Worker**: OCS singleton.go reduced by 244 lines — event dispatch fully delegated to V2 Converter with simplified SSE integration. (#434)
+- **Messaging**: Chat access non-blocking — `handleChatEntered` no longer propagates errors, record failures logged as Warn instead of blocking user flow. (#442)
+
+### Fixed
+
+- **Worker**: Fix tool failure edge case — `isFailed=true` with nil Error now reports "tool failed" instead of silently falling through to success path. (#434)
+- **Worker**: Fix cross-process turnState leak — add `Converter.Reset()` called in `startProcessLocked` to prevent stale state across process restarts. (#434)
+- **Worker**: Fix data race on conn.variant/allowedModel — consolidate reads and writes under single `conn.mu` lock acquisition. (#434)
+- **Messaging**: Fix Slack reasoning status — add `events.Reasoning` → `StatusThinking` mapping in `notifyStatusFromEvent`. (#442)
+
 ## [1.14.0] - 2026-05-15
 
 ### Summary
