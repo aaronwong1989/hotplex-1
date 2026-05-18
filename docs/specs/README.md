@@ -22,6 +22,7 @@
 
 | 文档 | 描述 | 状态 | 日期 | 进度 |
 |------|------|------|------|------|
+| [Codex-CLI-Worker-Spec.md](./Codex-CLI-Worker-Spec.md) | Codex CLI Worker 集成 — 第三个 Worker 类型，支持 OpenAI Codex | draft | 2026-05-18 | 0% |
 | [Worker-GAP-Analysis-2026-05-15.md](./Worker-GAP-Analysis-2026-05-15.md) | Worker GAP 分析 — OCS vs CC Worker 能力差距与实施计划 | active | 2026-05-15 | 0% |
 | [Session-History-Persistence-Spec.md](./Session-History-Persistence-Spec.md) | Session 历史持久化 — 会话重放与历史查询 | draft | 2026-04-28 | 40% |
 | [Per-Bot-Agent-Config-Spec.md](./Per-Bot-Agent-Config-Spec.md) | Per-Bot Agent 配置 — 独立 Bot 人格与上下文 | implemented | 2026-05-03 | 100% |
@@ -80,7 +81,7 @@
 ### 按领域分类
 
 - **架构/Gateway**: 9 个
-- **Worker/Session**: 4 个
+- **Worker/Session**: 5 个
 - **平台适配**: 2 个
 - **定时任务**: 2 个
 - **CLI/Onboard**: 3 个
