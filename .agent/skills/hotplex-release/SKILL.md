@@ -359,6 +359,8 @@ gh run watch <RUN_ID> --exit-status
 # CI 完成后，提取 CHANGELOG 内容替换自动生成的注释
 # 将 1.2.0 替换为当前发布的纯数字版本号
 VERSION="1.2.0"
+# 注意：必须用 $2 == ver（字符串精确比较），严禁用 $0 ~ ver（正则匹配）
+# 因为 "[1.16.0]" 中的方括号会被 awk 当作字符类，导致匹配所有版本
 awk -v ver="[$VERSION]" '
   /^## \[/ && $2 == ver { found=1; next }
   /^## \[/ && found { exit }
@@ -367,7 +369,13 @@ awk -v ver="[$VERSION]" '
 
 # 验证提取结果：首行必须是 ### 开头，且非空
 head -1 /tmp/release-notes.md | grep -q "^### " || { echo "ERROR: Release notes extraction failed — first line is not a changelog section"; exit 1; }
-wc -l /tmp/release-notes.md
+# 验证行数合理（正常版本 15-80 行，若超过 100 行说明提取了多个版本）
+LINES=$(wc -l < /tmp/release-notes.md)
+if [ "$LINES" -gt 100 ]; then
+  echo "ERROR: Release notes has ${LINES} lines — likely extracted multiple versions, expected < 100"
+  exit 1
+fi
+echo "Release notes: ${LINES} lines"
 
 # 追加 Contributors 段（圆形头像，不使用 @mention 避免与 GitHub 原生列表重复）
 LAST_TAG=$(git tag --sort=-version:refname | sed -n '2p')
