@@ -162,26 +162,32 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 
 Cron 未启用时返回 `503 Service Unavailable`。
 
-### Bot 状态
+### Bot 管理
+
+Bot 状态查询、配置管理和 Agent 配置文件操作端点。
 
 | 方法 | 路径 | Scope | 说明 |
 |------|------|-------|------|
-| GET | `/admin/bots` | `admin:read` | 列出所有注册 Bot |
-| GET | `/admin/bots/{name}` | `admin:read` | 单个 Bot 详情 |
+| GET | `/admin/bots` | `admin:read` | 列出所有活跃 bot |
+| GET | `/admin/bots/{name}` | `admin:read` | 单个 bot 详情 |
+| POST | `/admin/bots` | `admin:write` | 注册新 bot |
+| PATCH | `/admin/bots/{name}` | `admin:write` | 更新 bot 配置（部分更新） |
+| DELETE | `/admin/bots/{name}` | `admin:write` | 删除 bot 注册 |
+| GET | `/admin/bots/config` | `admin:read` | 列出所有 bot 配置 |
+| GET | `/admin/bots/{name}/config` | `admin:read` | 单个 bot 完整配置 |
+| GET | `/admin/bots/{name}/config/{file}` | `admin:read` | 读取 Agent 配置文件（如 SOUL.md、AGENTS.md） |
+| PUT | `/admin/bots/{name}/config/{file}` | `admin:write` | 写入 Agent 配置文件 |
+| GET | `/admin/bots/{name}/preview` | `admin:read` | 预览组装后的系统提示（B+C 通道完整输出） |
 
-**GET /admin/bots** — 返回所有活跃 Bot 列表，每个条目包含 `name`（Bot 名称）、`platform`（slack/feishu）、`bot_id`（平台 Bot ID）、`status`（连接状态）、`connected_at`（连接时间）、`soul`（人格标识）、`worker_type`（Worker 类型）。
+**GET /admin/bots** — 返回所有活跃 bot 列表，含 name、platform、worker_type、状态等信息。
 
-**GET /admin/bots/{name}`** — 按名称查询 Bot 详情。Bot 未找到时返回 `404`。
+**POST /admin/bots** — 注册新 bot，JSON body 含平台凭证和配置。返回 `201 Created`。
 
-```bash
-# 列出所有 Bot
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9999/admin/bots
+**PATCH /admin/bots/{name}** — 部分更新 bot 配置（凭证、worker_type 等）。返回 `204 No Content`。
 
-# 查询单个 Bot
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9999/admin/bots/my-bot
-```
+**GET /admin/bots/{name}/preview** — 返回该 bot 组装后的完整系统提示，包含 B 通道（directives）和 C 通道（context）内容，便于调试 Agent 人格配置。
+
+**PUT /admin/bots/{name}/config/{file}`** — 写入指定 Agent 配置文件（如 `SOUL.md`、`AGENTS.md`、`USER.md`）。请求体为文件内容，Content-Type 为 `text/plain`。
 
 ## Gateway API 端点
 

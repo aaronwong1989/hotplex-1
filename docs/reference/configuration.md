@@ -262,6 +262,23 @@ LLM Provider 返回临时错误（429、529、400 等）时的自动重试配置
 | `ready_poll_interval` | duration | `200ms` | `HOTPLEX_WORKER_OPENCODE_SERVER_READY_POLL_INTERVAL` | 就绪状态轮询间隔 |
 | `http_timeout` | duration | `30s` | `HOTPLEX_WORKER_OPENCODE_SERVER_HTTP_TIMEOUT` | HTTP 请求超时 |
 
+#### 3.7.5 codex_cli — Codex CLI Worker
+
+OpenAI Codex CLI Worker，支持双模式：exec（每次 Turn fork 新进程）和 app-server（单例持久进程，推荐）。
+
+| 字段 | 类型 | 默认值 | 环境变量 | 说明 |
+|------|------|--------|----------|------|
+| `command` | string | `codex` | — | Worker 启动命令。支持带子命令 |
+| `model` | string | `""` | — | 模型名称。空值使用 Codex 默认模型（`~/.codex/config.toml`） |
+| `sandbox` | string | `workspace-write` | — | 沙箱模式：`read-only`、`workspace-write`、`danger-full-access` |
+| `approval_mode` | string | `never` | — | 审批模式：`untrusted`（所有操作需审批）、`on-request`（仅高风险操作）、`never`（全自动） |
+| `ephemeral` | bool | `true` | — | 临时会话模式。不持久化到磁盘，Session 结束后数据清除 |
+| `startup_timeout` | duration | `30s` | — | 进程启动超时 |
+| `use_app_server` | bool | `true` | — | 使用持久 app-server 模式（推荐）。`false` 则使用每次 exec 的 one-shot 模式 |
+| `idle_drain_period` | duration | `30m` | — | app-server 模式下空闲排空超时。超时后单例进程关闭 |
+
+> **注意**：Codex CLI Worker 的所有配置项仅支持 YAML 配置，不支持环境变量覆盖。
+
 ---
 
 ### 3.8 agent_config — Agent 人格与上下文
