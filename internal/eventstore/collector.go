@@ -67,19 +67,21 @@ type Collector struct {
 	closeWg  sync.WaitGroup
 	log      *slog.Logger
 
-	accumMu sync.Mutex
-	accum   map[string]*deltaAccumulator // sessionID → active delta accumulator
-	dropped atomic.Int64
+	accumMu        sync.Mutex
+	accum          map[string]*deltaAccumulator // sessionID → active delta accumulator
+	reasoningAccum map[string]*deltaAccumulator // sessionID → active reasoning accumulator
+	dropped        atomic.Int64
 }
 
 // NewCollector creates a Collector that writes events to store.
 func NewCollector(store EventStore, log *slog.Logger) *Collector {
 	c := &Collector{
-		store:    store,
-		captureC: make(chan *captureRequest, collectorChanCap),
-		closeC:   make(chan struct{}),
-		log:      log.With("component", "eventstore-collector"),
-		accum:    make(map[string]*deltaAccumulator),
+		store:          store,
+		captureC:       make(chan *captureRequest, collectorChanCap),
+		closeC:         make(chan struct{}),
+		log:            log.With("component", "eventstore-collector"),
+		accum:          make(map[string]*deltaAccumulator),
+		reasoningAccum: make(map[string]*deltaAccumulator),
 	}
 	c.closeWg.Add(1)
 	go c.runWriter()
@@ -87,17 +89,22 @@ func NewCollector(store EventStore, log *slog.Logger) *Collector {
 }
 
 // Capture sends an event to the collector for async persistence.
-// If the event is a message.delta, it is accumulated in-memory and merged
-// on message.end or next non-delta event.
+// MessageDelta and Reasoning events are accumulated in-memory and merged
+// on flush trigger (MessageEnd, next storable event, size/timer threshold).
 func (c *Collector) Capture(sessionID string, seq int64, eventType events.Kind, data json.RawMessage, direction, source string) {
 	if eventType == events.MessageDelta {
-		c.accumulateDelta(sessionID, seq, data)
+		c.flushAndAccumulate(sessionID, seq, false, data)
 		return
 	}
 
-	// MessageEnd triggers flush but is not stored itself.
+	if eventType == events.Reasoning {
+		c.flushAndAccumulate(sessionID, seq, true, data)
+		return
+	}
+
+	// MessageEnd triggers flush of both accumulators but is not stored itself.
 	if eventType == events.MessageEnd {
-		c.flushDelta(sessionID)
+		c.flushBoth(sessionID)
 		return
 	}
 
@@ -105,7 +112,7 @@ func (c *Collector) Capture(sessionID string, seq int64, eventType events.Kind, 
 		return
 	}
 
-	c.flushDelta(sessionID)
+	c.flushBoth(sessionID)
 
 	req := &captureRequest{event: &StoredEvent{
 		SessionID: sessionID,
@@ -119,6 +126,55 @@ func (c *Collector) Capture(sessionID string, seq int64, eventType events.Kind, 
 	c.send(req)
 }
 
+// flushAndAccumulate holds accumMu once to cross-flush the other accumulator and
+// accumulate the incoming event. isReasoning selects which map to use.
+func (c *Collector) flushAndAccumulate(sessionID string, seq int64, isReasoning bool, data json.RawMessage) {
+	c.accumMu.Lock()
+
+	// Cross-flush the other accumulator under the same lock.
+	var flushed *deltaAccumulator
+	if isReasoning {
+		flushed = c.accum[sessionID]
+		delete(c.accum, sessionID)
+	} else {
+		flushed = c.reasoningAccum[sessionID]
+		delete(c.reasoningAccum, sessionID)
+	}
+
+	// Accumulate into target map.
+	var acc *deltaAccumulator
+	if isReasoning {
+		acc = c.getOrCreateReasoningAccum(sessionID)
+	} else {
+		acc = c.getOrCreateAccum(sessionID)
+	}
+	if acc != nil {
+		acc.append(seq, data)
+	}
+	c.accumMu.Unlock()
+
+	if flushed != nil && flushed.count > 0 {
+		c.send(flushed.toRequest(sessionID))
+	}
+}
+
+// flushBoth flushes both delta and reasoning accumulators under a single lock.
+func (c *Collector) flushBoth(sessionID string) {
+	c.accumMu.Lock()
+	dAcc := c.accum[sessionID]
+	delete(c.accum, sessionID)
+	rAcc := c.reasoningAccum[sessionID]
+	delete(c.reasoningAccum, sessionID)
+	c.accumMu.Unlock()
+
+	if dAcc != nil && dAcc.count > 0 {
+		c.send(dAcc.toRequest(sessionID))
+	}
+	if rAcc != nil && rAcc.count > 0 {
+		c.send(rAcc.toRequest(sessionID))
+	}
+}
+
 // getOrCreateAccum returns the delta accumulator for sessionID, creating one if needed.
 // Caller must hold c.accumMu. Returns nil if the collector is closed.
 func (c *Collector) getOrCreateAccum(sessionID string) *deltaAccumulator {
@@ -127,32 +183,45 @@ func (c *Collector) getOrCreateAccum(sessionID string) *deltaAccumulator {
 	}
 	acc := c.accum[sessionID]
 	if acc == nil {
-		acc = newDeltaAccumulator()
+		acc = newDeltaAccumulator(events.Message)
 		c.accum[sessionID] = acc
 	}
 	return acc
 }
 
-// accumulateDelta appends a message.delta event to the per-session accumulator.
-func (c *Collector) accumulateDelta(sessionID string, seq int64, data json.RawMessage) {
-	c.accumMu.Lock()
-	acc := c.getOrCreateAccum(sessionID)
-	if acc != nil {
-		acc.append(seq, data)
+// getOrCreateReasoningAccum returns the reasoning accumulator for sessionID.
+// Caller must hold c.accumMu. Returns nil if the collector is closed.
+func (c *Collector) getOrCreateReasoningAccum(sessionID string) *deltaAccumulator {
+	if c.reasoningAccum == nil {
+		return nil
 	}
-	c.accumMu.Unlock()
+	acc := c.reasoningAccum[sessionID]
+	if acc == nil {
+		acc = newDeltaAccumulator(events.Reasoning)
+		c.reasoningAccum[sessionID] = acc
+	}
+	return acc
 }
 
-func (c *Collector) flushDelta(sessionID string) {
+// CaptureReasoningString accumulates a reasoning content string directly,
+// skipping the json.Marshal/Unmarshal round-trip of Capture.
+// Flushes immediately when accumulated content exceeds deltaFlushSize.
+func (c *Collector) CaptureReasoningString(sessionID string, seq int64, content string) {
 	c.accumMu.Lock()
-	acc := c.accum[sessionID]
-	delete(c.accum, sessionID)
-	c.accumMu.Unlock()
-
-	if acc == nil || acc.count == 0 {
+	acc := c.getOrCreateReasoningAccum(sessionID)
+	if acc == nil {
+		c.accumMu.Unlock()
 		return
 	}
-	c.send(acc.toRequest(sessionID))
+	acc.appendRaw(seq, content)
+
+	if acc.content.Len() >= deltaFlushSize {
+		delete(c.reasoningAccum, sessionID)
+		c.accumMu.Unlock()
+		c.send(acc.toRequest(sessionID))
+		return
+	}
+	c.accumMu.Unlock()
 }
 
 func (c *Collector) send(req *captureRequest) {
@@ -170,13 +239,20 @@ func (c *Collector) send(req *captureRequest) {
 
 // Close drains the capture channel and flushes remaining events.
 func (c *Collector) Close() error {
-	// Swap accumulator map under lock, flush outside to avoid deadlock.
+	// Swap accumulator maps under lock, flush outside to avoid deadlock.
 	c.accumMu.Lock()
 	pending := c.accum
+	pendingReasoning := c.reasoningAccum
 	c.accum = nil
+	c.reasoningAccum = nil
 	c.accumMu.Unlock()
 
 	for sid, acc := range pending {
+		if acc.count > 0 {
+			c.send(acc.toRequest(sid))
+		}
+	}
+	for sid, acc := range pendingReasoning {
 		if acc.count > 0 {
 			c.send(acc.toRequest(sid))
 		}
@@ -243,6 +319,12 @@ func (c *Collector) flushTimedOutAccumulators(batch *[]*captureRequest) {
 			*batch = append(*batch, acc.toRequest(sid))
 		}
 	}
+	for sid, acc := range c.reasoningAccum {
+		if now.Sub(acc.firstSeenAt) >= deltaFlushInterval {
+			delete(c.reasoningAccum, sid)
+			*batch = append(*batch, acc.toRequest(sid))
+		}
+	}
 	c.accumMu.Unlock()
 }
 
@@ -297,15 +379,17 @@ func (c *Collector) CaptureDeltaString(sessionID string, seq int64, content stri
 	c.accumMu.Unlock()
 }
 
-// ResetSession discards any accumulated delta content for the given session.
+// ResetSession discards any accumulated delta and reasoning content for the given session.
 func (c *Collector) ResetSession(sessionID string) {
 	c.accumMu.Lock()
 	delete(c.accum, sessionID)
+	delete(c.reasoningAccum, sessionID)
 	c.accumMu.Unlock()
 }
 
-// deltaAccumulator merges message.delta content in-memory.
+// deltaAccumulator merges streaming content (message.delta or reasoning) in-memory.
 type deltaAccumulator struct {
+	eventType   events.Kind
 	content     strings.Builder
 	seq         int64
 	firstSeq    int64
@@ -314,8 +398,8 @@ type deltaAccumulator struct {
 	firstSeenAt time.Time
 }
 
-func newDeltaAccumulator() *deltaAccumulator {
-	return &deltaAccumulator{}
+func newDeltaAccumulator(eventType events.Kind) *deltaAccumulator {
+	return &deltaAccumulator{eventType: eventType}
 }
 
 func (a *deltaAccumulator) append(seq int64, data json.RawMessage) {
@@ -341,13 +425,13 @@ func (a *deltaAccumulator) appendRaw(seq int64, content string) {
 func (a *deltaAccumulator) toRequest(sessionID string) *captureRequest {
 	mergedData, _ := json.Marshal(map[string]any{
 		"content":      a.content.String(),
-		"merged_count": a.lastSeq - a.firstSeq + 1,
+		"merged_count": a.count,
 		"seq_range":    []int64{a.firstSeq, a.lastSeq},
 	})
 	return &captureRequest{event: &StoredEvent{
 		SessionID: sessionID,
 		Seq:       a.seq,
-		Type:      string(events.Message),
+		Type:      string(a.eventType),
 		Data:      mergedData,
 		Direction: "outbound",
 		Source:    SourceNormal,
