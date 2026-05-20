@@ -399,7 +399,7 @@ AI-native 定时任务引擎：自然语言 prompt 作为 payload，结果投递
 
 #### 3.11.7 多 Bot 配置（Multi-Bot）
 
-每个平台支持多个独立 bot 实例，各自拥有独立凭证、STT/TTS 和 soul 配置。
+每个平台支持多个独立 bot 实例，各自拥有独立凭证、STT/TTS 配置。
 
 **SlackBotConfig 字段**：
 
@@ -408,7 +408,6 @@ AI-native 定时任务引擎：自然语言 prompt 作为 payload，结果投递
 | `name` | string | Bot 名称（同一平台内唯一，必填） |
 | `bot_token` | string | Slack Bot Token（`xoxb-...`） |
 | `app_token` | string | Slack App Token（`xapp-...`） |
-| `soul` | string | Bot 人格标识（显示名称） |
 | `worker_type` | string | 覆盖 Worker 类型 |
 | `stt_*` | — | 覆盖 STT 配置（继承平台级 → messaging 级） |
 | `tts_*` | — | 覆盖 TTS 配置（继承平台级 → messaging 级） |
@@ -420,7 +419,6 @@ AI-native 定时任务引擎：自然语言 prompt 作为 payload，结果投递
 | `name` | string | Bot 名称（同一平台内唯一，必填） |
 | `app_id` | string | 飞书 App ID |
 | `app_secret` | string | 飞书 App Secret |
-| `soul` | string | Bot 人格标识 |
 | `worker_type` | string | 覆盖 Worker 类型 |
 | `stt_*` | — | 覆盖 STT 配置 |
 | `tts_*` | — | 覆盖 TTS 配置 |
