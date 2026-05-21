@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/hrygo/hotplex/pkg/events"
 )
 
 func TestCardHeaderToMap(t *testing.T) {
@@ -164,4 +166,108 @@ func TestStringPtr(t *testing.T) {
 	p := stringPtr("test")
 	require.NotNil(t, p)
 	require.Equal(t, "test", *p)
+}
+
+func TestBuildQuestionElements(t *testing.T) {
+	t.Parallel()
+
+	t.Run("options without descriptions", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{
+				Header:   "Auth method",
+				Question: "Which library?",
+				Options: []events.QuestionOption{
+					{Label: "JWT"},
+					{Label: "Session"},
+					{Label: "OAuth"},
+				},
+			},
+		}
+		elements := buildQuestionElements(questions)
+
+		// Expect: markdown + action
+		require.Len(t, elements, 2)
+
+		// Markdown element: no numbered list (no descriptions)
+		md := elements[0]
+		require.Equal(t, "markdown", md["tag"])
+		content := md["content"].(string)
+		require.Contains(t, content, "**Auth method**")
+		require.Contains(t, content, "Which library?")
+		require.NotContains(t, content, "1.") // no numbered list
+
+		// Action element: 3 buttons
+		action := elements[1]
+		require.Equal(t, "action", action["tag"])
+		buttons := action["actions"].([]map[string]any)
+		require.Len(t, buttons, 3)
+		require.Equal(t, "button", buttons[0]["tag"])
+		require.Equal(t, "JWT", buttons[0]["text"].(map[string]any)["content"])
+		click := buttons[0]["click"].(map[string]any)
+		require.Equal(t, "copy_text", click["tag"])
+		require.Equal(t, "JWT", click["value"])
+	})
+
+	t.Run("options with descriptions", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{
+				Header:   "Auth",
+				Question: "Pick one",
+				Options: []events.QuestionOption{
+					{Label: "JWT", Description: "Token-based"},
+					{Label: "Session", Description: "Server-side"},
+				},
+			},
+		}
+		elements := buildQuestionElements(questions)
+		require.Len(t, elements, 2)
+
+		// Markdown should include numbered list with descriptions
+		md := elements[0]
+		content := md["content"].(string)
+		require.Contains(t, content, "1. **JWT** — Token-based")
+		require.Contains(t, content, "2. **Session** — Server-side")
+
+		// Buttons still have label only
+		buttons := elements[1]["actions"].([]map[string]any)
+		require.Len(t, buttons, 2)
+		require.Equal(t, "JWT", buttons[0]["text"].(map[string]any)["content"])
+	})
+
+	t.Run("no options", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{Header: "Q", Question: "What?"},
+		}
+		elements := buildQuestionElements(questions)
+		require.Len(t, elements, 1)
+		require.Equal(t, "markdown", elements[0]["tag"])
+	})
+
+	t.Run("multiple questions", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{Header: "Q1", Question: "First?", Options: []events.QuestionOption{{Label: "A"}, {Label: "B"}}},
+			{Header: "Q2", Question: "Second?", Options: []events.QuestionOption{{Label: "C"}}},
+		}
+		elements := buildQuestionElements(questions)
+		// Q1: markdown + action, Q2: markdown + action = 4
+		require.Len(t, elements, 4)
+		require.Equal(t, "markdown", elements[0]["tag"])
+		require.Equal(t, "action", elements[1]["tag"])
+		require.Equal(t, "markdown", elements[2]["tag"])
+		require.Equal(t, "action", elements[3]["tag"])
+	})
+
+	t.Run("empty header defaults to Question", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{Question: "What?"},
+		}
+		elements := buildQuestionElements(questions)
+		content := elements[0]["content"].(string)
+		require.Contains(t, content, "**Question**")
+	})
 }

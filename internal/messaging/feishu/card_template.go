@@ -3,7 +3,10 @@ package feishu
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+
+	"github.com/hrygo/hotplex/pkg/events"
 )
 
 // Card header template color constants (Feishu CardKit v2).
@@ -167,4 +170,60 @@ func turnTags(turnNum int, model, branch, workDir string) []cardTag {
 		tags = append(tags, cardTag{Text: branch, Color: "indigo"})
 	}
 	return tags
+}
+
+// buildQuestionElements builds CardKit v2 body elements for a question card.
+// Each question gets a markdown element (with numbered descriptions if present)
+// followed by an action element with copy_text buttons.
+func buildQuestionElements(questions []events.Question) []map[string]any {
+	var elements []map[string]any
+
+	for _, q := range questions {
+		headerLabel := q.Header
+		if headerLabel == "" {
+			headerLabel = "Question"
+		}
+
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "**%s**\n%s", headerLabel, q.Question)
+
+		// If any option has a description, show a numbered reference list.
+		if slices.ContainsFunc(q.Options, func(o events.QuestionOption) bool { return o.Description != "" }) {
+			sb.WriteString("\n\n")
+			for i, opt := range q.Options {
+				if opt.Description != "" {
+					fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, opt.Label, opt.Description)
+				} else {
+					fmt.Fprintf(&sb, "%d. **%s**\n", i+1, opt.Label)
+				}
+			}
+		}
+
+		elements = append(elements, map[string]any{
+			"tag":     "markdown",
+			"content": sb.String(),
+		})
+
+		// Action buttons with copy_text behavior.
+		if len(q.Options) > 0 {
+			buttons := make([]map[string]any, 0, len(q.Options))
+			for _, opt := range q.Options {
+				buttons = append(buttons, map[string]any{
+					"tag":  "button",
+					"text": map[string]any{"tag": "plain_text", "content": opt.Label},
+					"type": "default",
+					"click": map[string]any{
+						"tag":   "copy_text",
+						"value": opt.Label,
+					},
+				})
+			}
+			elements = append(elements, map[string]any{
+				"tag":     "action",
+				"actions": buttons,
+			})
+		}
+	}
+
+	return elements
 }

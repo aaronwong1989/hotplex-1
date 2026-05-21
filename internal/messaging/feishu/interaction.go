@@ -67,40 +67,25 @@ func (c *FeishuConn) sendPermissionRequest(ctx context.Context, env *events.Enve
 	return nil
 }
 
-// sendQuestionRequest posts a question request card to Feishu.
+// sendQuestionRequest posts a question request card to Feishu with CardKit v2
+// action buttons. Each button uses copy_text click behavior so users can tap
+// to copy the option label and paste it as their response.
 func (c *FeishuConn) sendQuestionRequest(ctx context.Context, env *events.Envelope) error {
 	data, err := messaging.ExtractQuestionData(env)
 	if err != nil {
 		return fmt.Errorf("feishu: extract question data: %w", err)
 	}
 
-	var sb strings.Builder
-	for _, q := range data.Questions {
-		headerLabel := q.Header
-		if headerLabel == "" {
-			headerLabel = "Question"
-		}
-		fmt.Fprintf(&sb, "**%s**\n%s\n", headerLabel, q.Question)
+	elements := buildQuestionElements(data.Questions)
+	elements = append(elements,
+		map[string]any{"tag": "hr"},
+		map[string]any{"tag": "markdown", "content": "💬 点击按钮复制选项文本，粘贴发送即可响应\n也可直接回复选项文本或自定义答案"},
+	)
 
-		// List options
-		if len(q.Options) > 0 {
-			for _, opt := range q.Options {
-				label := opt.Label
-				if opt.Description != "" {
-					label += " — " + opt.Description
-				}
-				fmt.Fprintf(&sb, "- %s\n", label)
-			}
-		}
-		sb.WriteString("\n")
-	}
-
-	footer := "---\n💬 回复选项文本或自定义答案来响应此问题"
-
-	cardJSON := buildInteractionCard(sb.String(), footer, cardHeader{
+	cardJSON := buildCard(cardHeader{
 		Title:    "用户输入请求",
 		Template: headerYellow,
-	})
+	}, map[string]any{"wide_screen_mode": true}, elements)
 
 	chatID := c.chatID
 	if err := c.adapter.sendCardMessage(ctx, chatID, cardJSON); err != nil {
