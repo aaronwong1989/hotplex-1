@@ -84,6 +84,19 @@ func buildCard(header cardHeader, config map[string]any, elements []map[string]a
 	return encodeCard(card)
 }
 
+// buildV1Card constructs a JSON 1.0 card (no schema field). Required for
+// interactive elements like action + copy_text that are not supported in JSON 2.0.
+func buildV1Card(header cardHeader, config map[string]any, elements []map[string]any) string {
+	card := map[string]any{
+		"config": config,
+		"body":   map[string]any{"elements": elements},
+	}
+	if hm := header.toMap(); hm != nil {
+		card["header"] = hm
+	}
+	return encodeCard(card)
+}
+
 // toolActivityElementID is the element_id for the tool activity strip.
 const toolActivityElementID = "tool_activity"
 

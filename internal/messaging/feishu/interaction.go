@@ -82,7 +82,7 @@ func (c *FeishuConn) sendQuestionRequest(ctx context.Context, env *events.Envelo
 		map[string]any{"tag": "markdown", "content": "💬 点击按钮复制选项文本，粘贴发送即可响应\n也可直接回复选项文本或自定义答案"},
 	)
 
-	cardJSON := buildCard(cardHeader{
+	cardJSON := buildV1Card(cardHeader{
 		Title:    "用户输入请求",
 		Template: headerYellow,
 	}, map[string]any{"wide_screen_mode": true}, elements)

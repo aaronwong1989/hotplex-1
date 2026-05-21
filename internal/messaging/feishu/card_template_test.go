@@ -134,6 +134,66 @@ func TestBuildCard(t *testing.T) {
 	})
 }
 
+func TestBuildV1Card(t *testing.T) {
+	t.Parallel()
+	t.Run("no schema field", func(t *testing.T) {
+		t.Parallel()
+		got := buildV1Card(cardHeader{Title: "Test", Template: "yellow"},
+			map[string]any{"wide_screen_mode": true},
+			[]map[string]any{{"tag": "markdown", "content": "hello"}})
+		var card map[string]any
+		require.NoError(t, json.Unmarshal([]byte(got), &card))
+		require.Nil(t, card["schema"], "v1 card must not have schema field")
+		require.NotNil(t, card["body"])
+		hdr, ok := card["header"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "yellow", hdr["template"])
+	})
+
+	t.Run("full question card round-trip", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{
+				Header:   "Auth",
+				Question: "Pick one",
+				Options: []events.QuestionOption{
+					{Label: "JWT", Description: "Token-based"},
+					{Label: "OAuth"},
+				},
+			},
+		}
+		elements := buildQuestionElements(questions)
+		elements = append(elements,
+			map[string]any{"tag": "hr"},
+			map[string]any{"tag": "markdown", "content": "回复选项"},
+		)
+		got := buildV1Card(cardHeader{Title: "用户输入请求", Template: "yellow"},
+			map[string]any{"wide_screen_mode": true}, elements)
+
+		var card map[string]any
+		require.NoError(t, json.Unmarshal([]byte(got), &card))
+		require.Nil(t, card["schema"])
+		body := card["body"].(map[string]any)
+		elems := body["elements"].([]any)
+		// markdown + action + hr + footer = 4
+		require.Len(t, elems, 4)
+		require.Equal(t, "markdown", elems[0].(map[string]any)["tag"])
+		require.Equal(t, "action", elems[1].(map[string]any)["tag"])
+		require.Equal(t, "hr", elems[2].(map[string]any)["tag"])
+		require.Equal(t, "markdown", elems[3].(map[string]any)["tag"])
+
+		// Verify action buttons have copy_text click behavior
+		actionEl := elems[1].(map[string]any)
+		btns := actionEl["actions"].([]any)
+		require.Len(t, btns, 2)
+		btn0 := btns[0].(map[string]any)
+		require.Equal(t, "button", btn0["tag"])
+		click := btn0["click"].(map[string]any)
+		require.Equal(t, "copy_text", click["tag"])
+		require.Equal(t, "JWT", click["value"])
+	})
+}
+
 func TestBuildStreamingCard(t *testing.T) {
 	t.Parallel()
 	t.Run("no header", func(t *testing.T) {
