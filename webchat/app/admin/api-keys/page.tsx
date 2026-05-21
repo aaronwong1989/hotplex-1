@@ -31,6 +31,11 @@ function formatTime(iso?: string): string {
   });
 }
 
+function maskKey(key: string): string {
+  if (key.length <= 12) return '****';
+  return key.slice(0, 8) + '****' + key.slice(-4);
+}
+
 // ---------------------------------------------------------------------------
 // Page Component
 // ---------------------------------------------------------------------------
@@ -46,6 +51,7 @@ export default function APIKeysPage() {
   const [editingKey, setEditingKey] = useState<APIKeyUser | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Form state
   const [formUserId, setFormUserId] = useState('');
@@ -87,7 +93,8 @@ export default function APIKeysPage() {
         description: formDesc.trim() || undefined,
       });
       setCreatedKey(result.api_key);
-      setKeys((prev) => [result, ...prev]);
+      // Insert with masked key into list — full key only shown in dialog.
+      setKeys((prev) => [{ ...result, api_key: maskKey(result.api_key) }, ...prev]);
       setFormUserId('');
       setFormDesc('');
     } catch (err) {
@@ -141,6 +148,7 @@ export default function APIKeysPage() {
     setFormDesc('');
     setFormError(null);
     setCreatedKey(null);
+    setCopied(false);
     setShowCreate(true);
   };
 
@@ -155,6 +163,7 @@ export default function APIKeysPage() {
     setShowCreate(false);
     setEditingKey(null);
     setCreatedKey(null);
+    setCopied(false);
     setFormError(null);
   };
 
@@ -306,12 +315,11 @@ export default function APIKeysPage() {
                 key={k.api_key}
                 className="grid grid-cols-[1fr_140px_1fr_110px_120px] gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5 last:border-b-0 items-center transition-colors hover:bg-[var(--bg-hover)]"
               >
-                {/* API Key (masked) */}
+                {/* API Key — display masked value only */}
                 <span
                   className="truncate font-mono text-xs text-[var(--text-muted)]"
-                  title={k.api_key}
                 >
-                  {k.api_key}
+                  {k.api_key.includes('****') ? k.api_key : maskKey(k.api_key)}
                 </span>
 
                 {/* User ID */}
@@ -428,10 +436,14 @@ export default function APIKeysPage() {
                     {createdKey}
                   </code>
                   <button
-                    onClick={() => navigator.clipboard.writeText(createdKey)}
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdKey);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
                     className="shrink-0 rounded-[var(--radius-sm)] bg-[var(--accent-gold)]/10 px-2 py-1 text-[10px] font-bold uppercase text-[var(--accent-gold)] transition-colors hover:bg-[var(--accent-gold)]/20"
                   >
-                    Copy
+                    {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <button
@@ -498,7 +510,7 @@ export default function APIKeysPage() {
               Edit API Key
             </h2>
             <p className="mt-1 truncate font-mono text-xs text-[var(--text-faint)]">
-              {editingKey.api_key}
+              {maskKey(editingKey.api_key)}
             </p>
             <form
               onSubmit={(e) => {
@@ -559,8 +571,20 @@ function DialogOverlay({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    >
       <div
         className="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
