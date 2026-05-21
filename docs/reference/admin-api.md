@@ -49,8 +49,8 @@ admin:
 | `stats:read` | - | - | 🟢 Read | - | - | - | `GET /admin/stats`<br>`GET /admin/metrics` |
 | `config:read` | - | - | - | 🟢 Read | - | - | `POST /admin/config/validate` |
 | `config:write` | - | - | - | 🟠 Write | - | - | `POST /admin/config/rollback` |
-| `admin:read` | - | - | - | - | 🟢 Read | 🟢 Read | `GET /admin/logs`<br>`GET /admin/debug/...`<br>`GET /admin/bots`<br>`GET /api/cron/jobs` |
-| `admin:write` | - | - | - | - | - | 🟠 Write | `POST/PATCH/DELETE /api/cron/jobs`<br>`POST /api/cron/jobs/{id}/run` |
+| `admin:read` | - | - | - | - | 🟢 Read | 🟢 Read | `GET /admin/logs`<br>`GET /admin/debug/...`<br>`GET /admin/bots`<br>`GET /admin/cron/jobs`<br>`GET /admin/api-keys` |
+| `admin:write` | - | - | - | - | - | 🟠 Write | `POST/PATCH/DELETE /admin/cron/jobs`<br>`POST /admin/cron/jobs/{id}/run`<br>`POST/PATCH/DELETE /admin/api-keys`<br>`POST /admin/restart` |
 
 > 💡 **图例**：🟢 **Read** (只读查询) | 🟠 **Write** (状态变更/操作) | 🔴 **Delete** (物理删除)
 
@@ -152,13 +152,13 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 
 | 方法 | 路径 | Scope | 说明 |
 |------|------|-------|------|
-| GET | `/api/cron/jobs` | `admin:read` | 列出所有任务 |
-| GET | `/api/cron/jobs/{id}` | `admin:read` | 获取单个任务 |
-| POST | `/api/cron/jobs` | `admin:write` | 创建任务 |
-| PATCH | `/api/cron/jobs/{id}` | `admin:write` | 更新任务 |
-| DELETE | `/api/cron/jobs/{id}` | `admin:write` | 删除任务 |
-| POST | `/api/cron/jobs/{id}/run` | `admin:write` | 手动触发执行 |
-| GET | `/api/cron/jobs/{id}/runs` | `admin:read` | 执行历史 |
+| GET | `/admin/cron/jobs` | `admin:read` | 列出所有任务 |
+| GET | `/admin/cron/jobs/{id}` | `admin:read` | 获取单个任务 |
+| POST | `/admin/cron/jobs` | `admin:write` | 创建任务 |
+| PATCH | `/admin/cron/jobs/{id}` | `admin:write` | 更新任务 |
+| DELETE | `/admin/cron/jobs/{id}` | `admin:write` | 删除任务 |
+| POST | `/admin/cron/jobs/{id}/run` | `admin:write` | 手动触发执行 |
+| GET | `/admin/cron/jobs/{id}/runs` | `admin:read` | 执行历史 |
 
 Cron 未启用时返回 `503 Service Unavailable`。
 
@@ -189,6 +189,34 @@ Bot 状态查询、配置管理和 Agent 配置文件操作端点。
 
 **PUT /admin/bots/{name}/config/{file}`** — 写入指定 Agent 配置文件（如 `SOUL.md`、`AGENTS.md`、`USER.md`）。请求体为文件内容，Content-Type 为 `text/plain`。
 
+### 网关重启
+
+| 方法 | 路径 | Scope | 说明 |
+|------|------|-------|------|
+| POST | `/admin/restart` | `admin:write` | 触发网关重启 |
+
+**POST /admin/restart** — 异步触发网关重启。Gateway 在 500ms 延迟后执行重启，立即返回 `{ "status": "restarting" }`。使用 `restart helper`（独立 PGID）确保安全隔离。未配置 restart handler 时返回 `503`。
+
+### API Key 用户管理
+
+管理 API Key 到用户身份的映射，用于企业级多用户 Session 隔离。需要数据库支持（SQLite），未配置 DB resolver 时返回 `501 Not Implemented`。
+
+| 方法 | 路径 | Scope | 说明 |
+|------|------|-------|------|
+| GET | `/admin/api-keys` | `admin:read` | 列出所有 API Key 映射 |
+| POST | `/admin/api-keys` | `admin:write` | 创建 API Key 映射 |
+| GET | `/admin/api-keys/{id}` | `admin:read` | 获取单个映射详情 |
+| PATCH | `/admin/api-keys/{id}` | `admin:write` | 更新映射 |
+| DELETE | `/admin/api-keys/{id}` | `admin:write` | 删除映射 |
+
+**POST /admin/api-keys** — 创建 API Key → UserID 映射。JSON body 含 `user_id`（必填，最长 128 字符）和 `description`（可选，最长 512 字符）。API Key 由系统自动生成（32 字节随机 hex）。返回 `201 Created`。
+
+**GET /admin/api-keys** — 返回所有映射列表，`api_key` 字段自动脱敏（仅显示前 8 + 后 4 位）。
+
+**PATCH /admin/api-keys/{id}`** — 更新指定映射的 `user_id` 和 `description`。
+
+**DELETE /admin/api-keys/{id}`** — 物理删除映射，同时清除缓存的 resolver 条目。
+
 ## Gateway API 端点
 
 Gateway API（`/api/sessions`）监听在网关主端口（`8888`），面向客户端 SDK 和 WebSocket 连接，使用 API Key 或 JWT 认证（非 Bearer Token）。
@@ -205,13 +233,13 @@ Gateway API（`/api/sessions`）监听在网关主端口（`8888`），面向客
 
 所有 Gateway API 端点启用 CORS（`Access-Control-Allow-Origin: *`），支持 `GET`、`POST`、`DELETE`、`OPTIONS` 方法。
 
-**POST /api/cron/jobs** — JSON body 含 `name`、`schedule`（cron:/every:/at: 前缀）、`message`、`bot_id`、`owner_id`、`enabled`。返回 `201 Created`。
+**POST /admin/cron/jobs** — JSON body 含 `name`、`schedule`（cron:/every:/at: 前缀）、`message`、`bot_id`、`owner_id`、`enabled`。返回 `201 Created`。
 
-**PATCH /api/cron/jobs/{id}** — 部分更新，JSON body。返回 `204 No Content`。
+**PATCH /admin/cron/jobs/{id}** — 部分更新，JSON body。返回 `204 No Content`。
 
-**POST /api/cron/jobs/{id}/run** — 手动触发（异步），返回 `202 Accepted`。
+**POST /admin/cron/jobs/{id}/run** — 手动触发（异步），返回 `202 Accepted`。
 
-**GET /api/cron/jobs/{id}/runs** — 查询执行历史。
+**GET /admin/cron/jobs/{id}/runs** — 查询执行历史。
 
 ## 错误响应格式
 
@@ -255,5 +283,5 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 # 触发 Cron 任务
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9999/api/cron/jobs/daily-health/run
+  http://localhost:9999/admin/cron/jobs/daily-health/run
 ```

@@ -42,7 +42,9 @@ HotPlex Gateway 的安全模型遵循两条核心原则：
 
 ### Layer 2：Authentication（认证）
 
-- **API Key**：Gateway 级别的访问控制
+- **API Key**：Gateway 级别的访问控制。支持两种解析模式：
+  - **默认模式**：所有有效 Key 映射到 `api_user`（单用户场景）
+  - **企业模式**（APIKeyResolver）：通过数据库映射将 Key 关联到具体用户身份，实现多用户 Session 隔离。支持 `MapResolver`（配置文件）和 `DBResolver`（SQLite）两种实现
 - **JWT**：Session 级别的身份验证，携带 `user_id`、`bot_id`、`scopes`
 
 ### Layer 3：Input Validation（输入验证）
