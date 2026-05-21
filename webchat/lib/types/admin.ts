@@ -87,6 +87,16 @@ export interface CronJob {
   expires_at?: string;
 }
 
+// --- API Key ---
+
+export interface APIKeyUser {
+  api_key: string;
+  user_id: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // --- Stats ---
 
 export interface GatewayStats {
