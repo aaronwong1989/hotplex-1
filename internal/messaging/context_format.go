@@ -88,16 +88,27 @@ func SeverityLabel(severity ContextSeverity) string {
 }
 
 // FormatTokenCount converts a raw token count to a human-friendly string.
-// Examples: 76284 → "~76K", 200000 → "200K", 1500 → "~1.5K", 999 → "999"
+// Examples: 999 → "999", 1500 → "1.5K", 76284 → "76.3K", 200000 → "200K",
+// 1500000 → "1.5M", 2000000000 → "2B"
 func FormatTokenCount(tokens int) string {
-	if tokens < 1000 {
+	switch {
+	case tokens < 1_000:
 		return fmt.Sprintf("%d", tokens)
+	case tokens < 1_000_000:
+		return formatCompact(float64(tokens)/1_000, "K")
+	case tokens < 1_000_000_000:
+		return formatCompact(float64(tokens)/1_000_000, "M")
+	default:
+		return formatCompact(float64(tokens)/1_000_000_000, "B")
 	}
-	k := float64(tokens) / 1000
-	if k == float64(int(k)) {
-		return fmt.Sprintf("%dK", int(k))
+}
+
+// formatCompact formats v with unit, dropping ".0" for whole numbers.
+func formatCompact(v float64, unit string) string {
+	if v == float64(int(v)) {
+		return fmt.Sprintf("%d%s", int(v), unit)
 	}
-	return fmt.Sprintf("%.1fK", k)
+	return fmt.Sprintf("%.1f%s", v, unit)
 }
 
 // FormatTokenDisplay produces a human-friendly "used / max" string.

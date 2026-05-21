@@ -32,9 +32,14 @@ export function getContextLabel(s: ContextSeverity): string {
 }
 
 export function formatTokenCount(n: number): string {
-  if (n < 1000) return String(n);
-  const k = n / 1000;
-  return k % 1 === 0 ? `${k}K` : `~${k.toFixed(1)}K`;
+  if (n < 1_000) return String(n);
+  if (n < 1_000_000) return fmtCompact(n / 1_000, 'K');
+  if (n < 1_000_000_000) return fmtCompact(n / 1_000_000, 'M');
+  return fmtCompact(n / 1_000_000_000, 'B');
+}
+
+function fmtCompact(v: number, unit: string): string {
+  return v % 1 === 0 ? `${v}${unit}` : `${v.toFixed(1)}${unit}`;
 }
 
 export function formatTokenDisplay(used: number, max: number): string {
