@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.17.0] - 2026-05-21
+
+### Summary
+
+v1.17.0 是一次 minor 版本更新，聚焦于 **Admin WebUI 全面升级** 和 **企业级多用户隔离**。Admin 面板新增 Gateway 重启 API、Sessions 页面重构（实时更新/搜索筛选/详情视图）、API Key 用户管理 WebUI、Login 帮助面板，并在 Chat UI 侧边栏底部集成 Admin 入口；安全层新增 APIKeyResolver 实现 API Key → 用户身份映射，激活完整的会话隔离链路（UUIDv5 session key、SEC-008 跨用户拒绝、per-user 配额）；CodexCLI Worker 修复审批死锁和竞态条件；飞书 SDK 升级至 v3.9.1 并完成交互卡片按钮规格设计。
+
+### Added
+
+- **Security**: APIKeyResolver for enterprise multi-user session isolation — ChainResolver (config → DB) maps API keys to user identities, activating UUIDv5 session keys, SEC-008 cross-user rejection, per-user SQL filtering, and PoolManager per-user quotas. Admin API CRUD for api_key_users table with cache coherence. (#468)
+- **WebChat UI**: Admin WebUI overhaul — gateway restart endpoint (POST /admin/restart), sessions page with real-time updates/search/detail view, API Key user management page with create/edit/delete, login help accordion, admin dashboard enhancements with improved layout and stats. (#471, #473)
+- **WebChat UI**: Admin entry in chat sidebar — styled admin dashboard link at sidebar footer with icon container, hover gold accent, and descriptive subtitle. (#473)
+- **Messaging**: Add M/B units to FormatTokenCount for large token values — display as K/M/B suffixes with compact formatting, applied to both Go backend and webchat TS frontend. (#470)
+- **Messaging**: Upgrade Lark SDK to v3.9.1 and add interactive card buttons spec — comprehensive spec for implementing card button callbacks across Feishu/Slack/WebChat, documenting SDK card handler limitation. (#466)
+
+### Changed
+
+- **Worker**: CodexCLI security hardening — extract timeout constants, fix sendEnvelope timer leak with time.NewTimer + Stop(), unify write-mu blocks into writeFrame(), remove personality double-default.
+
+### Fixed
+
+- **Worker**: CodexCLI approval deadlock — server-initiated JSON-RPC requests (approvals) were silently dropped; implement HandlePermissionResponse via RespondServerRequest, add approval method aliases. (#462)
+- **Worker**: CodexCLI Input() TOCTOU race — move nil check into spawn(), enforce StartupTimeout, add 5s timeout for critical event sends, add doneCh-based lifecycle binding. (#462)
+- **Messaging**: FormatTokenCount unit boundary rounding — 999999 now shows "1M" instead of "1000.0K", use threshold-based unit bumping and stale ".0" suffix cleanup.
+- **Admin**: Routing, sessions UX, and login redirect loop — fix Next.js SPA directory-to-html resolution, correct admin URL default from 9090 to 9999, replace router.replace with window.location.replace to fix stale auth state.
+- **Release**: Guard changelog extraction against regex bracket misparse — add line count sanity check for multi-version extraction detection.
+
 ## [1.16.0] - 2026-05-20
 
 ### Summary
