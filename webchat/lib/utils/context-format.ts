@@ -33,13 +33,14 @@ export function getContextLabel(s: ContextSeverity): string {
 
 export function formatTokenCount(n: number): string {
   if (n < 1_000) return String(n);
-  if (n < 1_000_000) return fmtCompact(n / 1_000, 'K');
-  if (n < 1_000_000_000) return fmtCompact(n / 1_000_000, 'M');
+  if (n < 999_950) return fmtCompact(n / 1_000, 'K');
+  if (n < 999_950_000) return fmtCompact(n / 1_000_000, 'M');
   return fmtCompact(n / 1_000_000_000, 'B');
 }
 
 function fmtCompact(v: number, unit: string): string {
-  return v % 1 === 0 ? `${v}${unit}` : `${v.toFixed(1)}${unit}`;
+  const r = Math.round(v * 10) / 10;
+  return r % 1 === 0 ? `${r}${unit}` : `${r.toFixed(1)}${unit}`;
 }
 
 export function formatTokenDisplay(used: number, max: number): string {
