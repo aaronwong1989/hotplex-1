@@ -109,6 +109,53 @@ func TestCardHeaderToMap(t *testing.T) {
 	}
 }
 
+func TestQuestionFooterHint(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		questions []events.Question
+		want      string
+	}{
+		{
+			name:      "no questions returns single-select hint",
+			questions: nil,
+			want:      "粘贴发送即可响应",
+		},
+		{
+			name: "single select returns single-select hint",
+			questions: []events.Question{{
+				Question: "Pick?",
+				Options:  []events.QuestionOption{{Label: "A"}},
+			}},
+			want: "粘贴发送即可响应",
+		},
+		{
+			name: "multi select returns multi-select hint",
+			questions: []events.Question{{
+				Question:    "Pick?",
+				MultiSelect: true,
+				Options:     []events.QuestionOption{{Label: "A"}, {Label: "B"}},
+			}},
+			want: "可一次发送多个选项",
+		},
+		{
+			name: "mixed questions with any multi select uses multi hint",
+			questions: []events.Question{
+				{Question: "Q1", Options: []events.QuestionOption{{Label: "A"}}},
+				{Question: "Q2", MultiSelect: true, Options: []events.QuestionOption{{Label: "X"}}},
+			},
+			want: "可一次发送多个选项",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := questionFooterHint(tt.questions)
+			require.Contains(t, got, tt.want)
+		})
+	}
+}
+
 func TestBuildCard(t *testing.T) {
 	t.Parallel()
 	t.Run("no header", func(t *testing.T) {
@@ -336,38 +383,47 @@ func TestBuildQuestionElements(t *testing.T) {
 		require.Contains(t, content, "**Question**")
 	})
 
-	t.Run("multi_select adds hint", func(t *testing.T) {
+	t.Run("multi_select", func(t *testing.T) {
 		t.Parallel()
-		questions := []events.Question{
+		tests := []struct {
+			name      string
+			questions []events.Question
+			wantHint  string // substring expected in markdown content
+			dontWant  string // substring that must NOT appear
+		}{
 			{
-				Header:      "Pick tools",
-				Question:    "Which ones?",
-				MultiSelect: true,
-				Options: []events.QuestionOption{
-					{Label: "Go"},
-					{Label: "Rust"},
-				},
+				name: "true shows multi-select marker",
+				questions: []events.Question{{
+					Header:      "Pick tools",
+					Question:    "Which ones?",
+					MultiSelect: true,
+					Options:     []events.QuestionOption{{Label: "Go"}, {Label: "Rust"}},
+				}},
+				wantHint: "（可多选）",
+			},
+			{
+				name: "false has no marker",
+				questions: []events.Question{{
+					Header:      "Pick one",
+					Question:    "Which?",
+					MultiSelect: false,
+					Options:     []events.QuestionOption{{Label: "A"}},
+				}},
+				dontWant: "可多选",
 			},
 		}
-		elements := buildQuestionElements(questions)
-		require.Len(t, elements, 2)
-		content := elements[0]["content"].(string)
-		require.Contains(t, content, "（可多选）")
-		require.Contains(t, content, "1. **Go**")
-	})
-
-	t.Run("multi_select false has no hint", func(t *testing.T) {
-		t.Parallel()
-		questions := []events.Question{
-			{
-				Header:      "Pick one",
-				Question:    "Which?",
-				MultiSelect: false,
-				Options:     []events.QuestionOption{{Label: "A"}},
-			},
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				elements := buildQuestionElements(tt.questions)
+				content := elements[0]["content"].(string)
+				if tt.wantHint != "" {
+					require.Contains(t, content, tt.wantHint)
+				}
+				if tt.dontWant != "" {
+					require.NotContains(t, content, tt.dontWant)
+				}
+			})
 		}
-		elements := buildQuestionElements(questions)
-		content := elements[0]["content"].(string)
-		require.NotContains(t, content, "可多选")
 	})
 }

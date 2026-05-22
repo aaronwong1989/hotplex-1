@@ -349,18 +349,19 @@ func buildQuestionFallbackText(data *events.QuestionRequestData) string {
 	sb.WriteString("❓ 问题请求\n")
 
 	for i, q := range data.Questions {
-		headerLabel := q.Header
+		headerLabel := messaging.SanitizeText(q.Header)
 		if headerLabel == "" {
 			headerLabel = "Question"
 		}
-		fmt.Fprintf(&sb, "\n%s %d: %s\n", headerLabel, i+1, q.Question)
+		fmt.Fprintf(&sb, "\n%s %d: %s\n", headerLabel, i+1, messaging.SanitizeText(q.Question))
 
 		if len(q.Options) > 0 {
 			sb.WriteString("选项:\n")
 			for j, opt := range q.Options {
-				label := opt.Label
-				if opt.Description != "" {
-					label += " — " + opt.Description
+				label := messaging.SanitizeText(opt.Label)
+				desc := messaging.SanitizeText(opt.Description)
+				if desc != "" {
+					label += " — " + desc
 				}
 				fmt.Fprintf(&sb, "  %d. %s\n", j+1, label)
 			}

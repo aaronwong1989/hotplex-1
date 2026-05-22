@@ -197,6 +197,18 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 			headerLabel = "Question"
 		}
 
+		// Pre-sanitize all option fields once.
+		type sanitizedOpt struct {
+			Label, Desc string
+		}
+		opts := make([]sanitizedOpt, len(q.Options))
+		for i, opt := range q.Options {
+			opts[i] = sanitizedOpt{
+				Label: messaging.SanitizeText(opt.Label),
+				Desc:  messaging.SanitizeText(opt.Description),
+			}
+		}
+
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "**%s**\n%s", headerLabel, messaging.SanitizeText(q.Question))
 		if q.MultiSelect {
@@ -205,15 +217,13 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 
 		// Always show numbered option list as visible fallback —
 		// buttons may not render on all clients.
-		if len(q.Options) > 0 {
+		if len(opts) > 0 {
 			sb.WriteString("\n\n")
-			for i, opt := range q.Options {
-				label := messaging.SanitizeText(opt.Label)
-				desc := messaging.SanitizeText(opt.Description)
-				if desc != "" {
-					fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, label, desc)
+			for i, opt := range opts {
+				if opt.Desc != "" {
+					fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, opt.Label, opt.Desc)
 				} else {
-					fmt.Fprintf(&sb, "%d. **%s**\n", i+1, label)
+					fmt.Fprintf(&sb, "%d. **%s**\n", i+1, opt.Label)
 				}
 			}
 		}
@@ -224,17 +234,16 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 		})
 
 		// Action buttons with copy_text behavior.
-		if len(q.Options) > 0 {
-			buttons := make([]map[string]any, 0, len(q.Options))
-			for _, opt := range q.Options {
-				label := messaging.SanitizeText(opt.Label)
+		if len(opts) > 0 {
+			buttons := make([]map[string]any, 0, len(opts))
+			for _, opt := range opts {
 				buttons = append(buttons, map[string]any{
 					"tag":  "button",
-					"text": map[string]any{"tag": "plain_text", "content": label},
+					"text": map[string]any{"tag": "plain_text", "content": opt.Label},
 					"type": "default",
 					"click": map[string]any{
 						"tag":   "copy_text",
-						"value": label,
+						"value": opt.Label,
 					},
 				})
 			}
