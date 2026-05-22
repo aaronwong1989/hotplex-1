@@ -3,7 +3,6 @@ package feishu
 import (
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/hrygo/hotplex/pkg/events"
@@ -200,8 +199,9 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "**%s**\n%s", headerLabel, q.Question)
 
-		// If any option has a description, show a numbered reference list.
-		if slices.ContainsFunc(q.Options, func(o events.QuestionOption) bool { return o.Description != "" }) {
+		// Always show numbered option list as visible fallback —
+		// buttons may not render on all clients.
+		if len(q.Options) > 0 {
 			sb.WriteString("\n\n")
 			for i, opt := range q.Options {
 				if opt.Description != "" {

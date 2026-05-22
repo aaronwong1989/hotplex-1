@@ -249,13 +249,15 @@ func TestBuildQuestionElements(t *testing.T) {
 		// Expect: markdown + action
 		require.Len(t, elements, 2)
 
-		// Markdown element: no numbered list (no descriptions)
+		// Markdown element: always includes numbered list as fallback
 		md := elements[0]
 		require.Equal(t, "markdown", md["tag"])
 		content := md["content"].(string)
 		require.Contains(t, content, "**Auth method**")
 		require.Contains(t, content, "Which library?")
-		require.NotContains(t, content, "1.") // no numbered list
+		require.Contains(t, content, "1. **JWT**")
+		require.Contains(t, content, "2. **Session**")
+		require.Contains(t, content, "3. **OAuth**")
 
 		// Action element: 3 buttons
 		action := elements[1]
