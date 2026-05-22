@@ -881,7 +881,7 @@ make check
 |------|------|------|
 | `GET /api/sessions/{id}/history` | `id` 字段类型 `string` → `int64`；查询参数 `before_seq` → `before_id`；新增 `generation`/`turn_num`/`tokens_input`/`tokens_cache_write`/`tokens_cache_read` 字段 | WebChat 前端需适配 |
 | `GET /admin/sessions/{id}/stats` | `TurnStats` 新增 `generation`/`total_tokens_input`/`total_tokens_cache_write`/`total_tokens_cache_read` | Admin WebUI 需适配 |
-| `GET /api/cron/jobs/{id}/runs` | 同 `TurnStats` 变更 | CLI `--json` 输出新增字段（向后兼容） |
+| `GET /admin/cron/jobs/{id}/runs` | 同 `TurnStats` 变更 | CLI `--json` 输出新增字段（向后兼容） |
 
 ### 11.2 内部 Go 接口
 

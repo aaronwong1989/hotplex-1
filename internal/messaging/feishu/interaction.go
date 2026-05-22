@@ -78,7 +78,7 @@ func (c *FeishuConn) sendQuestionRequest(ctx context.Context, env *events.Envelo
 	elements := buildQuestionElements(data.Questions)
 	elements = append(elements,
 		map[string]any{"tag": "hr"},
-		map[string]any{"tag": "markdown", "content": "💬 点击按钮复制选项文本，粘贴发送即可响应\n也可直接回复选项文本或自定义答案"},
+		map[string]any{"tag": "markdown", "content": questionFooterHint(data.Questions)},
 	)
 
 	cardJSON := buildV1Card(cardHeader{
@@ -368,6 +368,12 @@ func buildQuestionFallbackText(data *events.QuestionRequestData) string {
 	}
 
 	sb.WriteString("\n回复选项文本或自定义答案来响应此问题")
+	for _, q := range data.Questions {
+		if q.MultiSelect {
+			sb.WriteString("\n提示: 此问题支持多选，可一次发送多个选项")
+			break
+		}
+	}
 	return sb.String()
 }
 

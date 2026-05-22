@@ -335,4 +335,39 @@ func TestBuildQuestionElements(t *testing.T) {
 		content := elements[0]["content"].(string)
 		require.Contains(t, content, "**Question**")
 	})
+
+	t.Run("multi_select adds hint", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{
+				Header:      "Pick tools",
+				Question:    "Which ones?",
+				MultiSelect: true,
+				Options: []events.QuestionOption{
+					{Label: "Go"},
+					{Label: "Rust"},
+				},
+			},
+		}
+		elements := buildQuestionElements(questions)
+		require.Len(t, elements, 2)
+		content := elements[0]["content"].(string)
+		require.Contains(t, content, "（可多选）")
+		require.Contains(t, content, "1. **Go**")
+	})
+
+	t.Run("multi_select false has no hint", func(t *testing.T) {
+		t.Parallel()
+		questions := []events.Question{
+			{
+				Header:      "Pick one",
+				Question:    "Which?",
+				MultiSelect: false,
+				Options:     []events.QuestionOption{{Label: "A"}},
+			},
+		}
+		elements := buildQuestionElements(questions)
+		content := elements[0]["content"].(string)
+		require.NotContains(t, content, "可多选")
+	})
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hrygo/hotplex/internal/messaging"
 	"github.com/hrygo/hotplex/pkg/events"
 )
 
@@ -191,23 +192,28 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 	var elements []map[string]any
 
 	for _, q := range questions {
-		headerLabel := q.Header
+		headerLabel := messaging.SanitizeText(q.Header)
 		if headerLabel == "" {
 			headerLabel = "Question"
 		}
 
 		var sb strings.Builder
-		fmt.Fprintf(&sb, "**%s**\n%s", headerLabel, q.Question)
+		fmt.Fprintf(&sb, "**%s**\n%s", headerLabel, messaging.SanitizeText(q.Question))
+		if q.MultiSelect {
+			sb.WriteString("\n*（可多选）*")
+		}
 
 		// Always show numbered option list as visible fallback —
 		// buttons may not render on all clients.
 		if len(q.Options) > 0 {
 			sb.WriteString("\n\n")
 			for i, opt := range q.Options {
-				if opt.Description != "" {
-					fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, opt.Label, opt.Description)
+				label := messaging.SanitizeText(opt.Label)
+				desc := messaging.SanitizeText(opt.Description)
+				if desc != "" {
+					fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, label, desc)
 				} else {
-					fmt.Fprintf(&sb, "%d. **%s**\n", i+1, opt.Label)
+					fmt.Fprintf(&sb, "%d. **%s**\n", i+1, label)
 				}
 			}
 		}
@@ -221,13 +227,14 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 		if len(q.Options) > 0 {
 			buttons := make([]map[string]any, 0, len(q.Options))
 			for _, opt := range q.Options {
+				label := messaging.SanitizeText(opt.Label)
 				buttons = append(buttons, map[string]any{
 					"tag":  "button",
-					"text": map[string]any{"tag": "plain_text", "content": opt.Label},
+					"text": map[string]any{"tag": "plain_text", "content": label},
 					"type": "default",
 					"click": map[string]any{
 						"tag":   "copy_text",
-						"value": opt.Label,
+						"value": label,
 					},
 				})
 			}
@@ -239,4 +246,14 @@ func buildQuestionElements(questions []events.Question) []map[string]any {
 	}
 
 	return elements
+}
+
+// questionFooterHint returns the appropriate footer hint based on question types.
+func questionFooterHint(questions []events.Question) string {
+	for _, q := range questions {
+		if q.MultiSelect {
+			return "💬 点击按钮复制选项文本，可一次发送多个选项（用空格或逗号分隔）\n也可直接回复选项文本或自定义答案"
+		}
+	}
+	return "💬 点击按钮复制选项文本，粘贴发送即可响应\n也可直接回复选项文本或自定义答案"
 }
