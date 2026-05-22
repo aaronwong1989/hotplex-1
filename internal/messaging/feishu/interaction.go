@@ -67,9 +67,8 @@ func (c *FeishuConn) sendPermissionRequest(ctx context.Context, env *events.Enve
 	return nil
 }
 
-// sendQuestionRequest posts a question request card to Feishu with CardKit v2
-// action buttons. Each button uses copy_text click behavior so users can tap
-// to copy the option label and paste it as their response.
+// sendQuestionRequest posts a question request card using JSON 1.0 format
+// (required for action + copy_text interactive buttons).
 func (c *FeishuConn) sendQuestionRequest(ctx context.Context, env *events.Envelope) error {
 	data, err := messaging.ExtractQuestionData(env)
 	if err != nil {

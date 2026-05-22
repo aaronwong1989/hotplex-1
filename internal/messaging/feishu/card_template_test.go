@@ -144,8 +144,11 @@ func TestBuildV1Card(t *testing.T) {
 		var card map[string]any
 		require.NoError(t, json.Unmarshal([]byte(got), &card))
 		require.Nil(t, card["schema"], "v1 card must not have schema field")
-		require.NotNil(t, card["body"])
+		require.Nil(t, card["body"], "v1 card must not have body wrapper")
 		hdr, ok := card["header"].(map[string]any)
+		elems := card["elements"].([]any)
+		require.Len(t, elems, 1)
+		require.Equal(t, "markdown", elems[0].(map[string]any)["tag"])
 		require.True(t, ok)
 		require.Equal(t, "yellow", hdr["template"])
 	})
@@ -173,8 +176,8 @@ func TestBuildV1Card(t *testing.T) {
 		var card map[string]any
 		require.NoError(t, json.Unmarshal([]byte(got), &card))
 		require.Nil(t, card["schema"])
-		body := card["body"].(map[string]any)
-		elems := body["elements"].([]any)
+		require.Nil(t, card["body"], "v1 card must not have body wrapper")
+		elems := card["elements"].([]any)
 		// markdown + action + hr + footer = 4
 		require.Len(t, elems, 4)
 		require.Equal(t, "markdown", elems[0].(map[string]any)["tag"])

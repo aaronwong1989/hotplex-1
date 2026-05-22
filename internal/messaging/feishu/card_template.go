@@ -83,12 +83,12 @@ func buildCard(header cardHeader, config map[string]any, elements []map[string]a
 	return encodeCard(card)
 }
 
-// buildV1Card constructs a JSON 1.0 card (no schema field). Required for
-// interactive elements like action + copy_text that are not supported in JSON 2.0.
+// buildV1Card constructs a JSON 1.0 card (no schema field, elements at root level).
+// Required for interactive elements like action + copy_text that are not supported in JSON 2.0.
 func buildV1Card(header cardHeader, config map[string]any, elements []map[string]any) string {
 	card := map[string]any{
-		"config": config,
-		"body":   map[string]any{"elements": elements},
+		"config":   config,
+		"elements": elements,
 	}
 	if hm := header.toMap(); hm != nil {
 		card["header"] = hm
@@ -184,7 +184,7 @@ func turnTags(turnNum int, model, branch, workDir string) []cardTag {
 	return tags
 }
 
-// buildQuestionElements builds CardKit v2 body elements for a question card.
+// buildQuestionElements builds card elements for a JSON 1.0 question card.
 // Each question gets a markdown element (with numbered descriptions if present)
 // followed by an action element with copy_text buttons.
 func buildQuestionElements(questions []events.Question) []map[string]any {
