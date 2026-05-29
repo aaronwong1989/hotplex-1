@@ -249,7 +249,7 @@ func TestManager_Start_RealProcess(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		stdin, stdout, _, err := m.Start(ctx, "echo", []string{"hello"}, nil, "")
+		stdin, stdout, err := m.Start(ctx, "echo", []string{"hello"}, nil, "")
 		require.NoError(t, err)
 		require.NotNil(t, stdin)
 		require.NotNil(t, stdout)
@@ -273,7 +273,7 @@ func TestManager_Start_RealProcess(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "nonexistent_binary_xyz", []string{}, nil, "")
+		_, _, err := m.Start(ctx, "nonexistent_binary_xyz", []string{}, nil, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "proc: start")
 	})
@@ -283,11 +283,11 @@ func TestManager_Start_RealProcess(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "echo", []string{"test"}, nil, "")
+		_, _, err := m.Start(ctx, "echo", []string{"test"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
-		_, _, _, err = m.Start(ctx, "echo", []string{"test2"}, nil, "")
+		_, _, err = m.Start(ctx, "echo", []string{"test2"}, nil, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "already started")
 	})
@@ -307,7 +307,7 @@ func TestManager_Terminate_GracefulExit(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
+		_, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -323,7 +323,7 @@ func TestManager_Terminate_GracefulExit(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
+		_, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -363,7 +363,7 @@ func TestManager_Wait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "echo", []string{"done"}, nil, "")
+		_, _, err := m.Start(ctx, "echo", []string{"done"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -387,7 +387,7 @@ func TestManager_Wait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sh", []string{"-c", "exit 42"}, nil, "")
+		_, _, err := m.Start(ctx, "sh", []string{"-c", "exit 42"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -413,7 +413,7 @@ func TestManager_ReadLine_MultiLine(t *testing.T) {
 		ctx := context.Background()
 
 		script := "echo line1; echo line2; echo line3"
-		_, _, _, err := m.Start(ctx, "sh", []string{"-c", script}, nil, "")
+		_, _, err := m.Start(ctx, "sh", []string{"-c", script}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -452,7 +452,7 @@ func TestManager_Start_AllowedTools(t *testing.T) {
 		ctx := context.Background()
 
 		// echo will ignore the extra args but we verify Start doesn't error.
-		_, _, _, err := m.Start(ctx, "echo", []string{"test"}, nil, "")
+		_, _, err := m.Start(ctx, "echo", []string{"test"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 		require.True(t, m.IsRunning())
@@ -475,7 +475,7 @@ func TestManager_WaitOnce_TerminateThenWait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
+		_, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -500,7 +500,7 @@ func TestManager_WaitOnce_TerminateThenWait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
+		_, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -530,7 +530,7 @@ func TestManager_WaitOnce_KillThenWait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
+		_, _, err := m.Start(ctx, "sleep", []string{"60"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -549,7 +549,7 @@ func TestManager_WaitOnce_KillThenWait(t *testing.T) {
 		m := New(Opts{Logger: slog.Default()})
 		ctx := context.Background()
 
-		_, _, _, err := m.Start(ctx, "echo", []string{"done"}, nil, "")
+		_, _, err := m.Start(ctx, "echo", []string{"done"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
 
@@ -613,10 +613,9 @@ func TestManager_drainStderr(t *testing.T) {
 		}
 		t.Parallel()
 		m := New(Opts{Logger: slog.Default()})
-		_, _, stderr, err := m.Start(context.Background(), "echo", []string{"test"}, nil, "")
+		_, _, err := m.Start(context.Background(), "echo", []string{"test"}, nil, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { m.Close() })
-		require.Nil(t, stderr, "Start should return nil stderr (ownership transferred to drainStderr)")
 		require.Nil(t, m.stderr, "m.stderr should be nil after ownership transfer")
 	})
 }

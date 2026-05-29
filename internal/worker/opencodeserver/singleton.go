@@ -257,7 +257,7 @@ func (s *SingletonProcessManager) startProcessLocked(ctx context.Context) error 
 	env := s.buildEnv()
 	s.proc = proc.New(proc.Opts{Logger: s.log})
 
-	stdin, stdout, _, err := s.proc.Start(context.Background(), binary, fullArgs, env, "")
+	stdin, stdout, err := s.proc.Start(context.Background(), binary, fullArgs, env, "")
 	if err != nil {
 		s.proc = nil
 		s.state = stateIdle

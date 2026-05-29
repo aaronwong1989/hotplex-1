@@ -74,15 +74,15 @@ func New(opts Opts) *Manager {
 // Start launches a new process with the given command and arguments.
 // It sets up a new process group (PGID) so that signals can be delivered
 // to the entire subtree without affecting the gateway process.
-func (m *Manager) Start(ctx context.Context, name string, args, env []string, dir string) (stdin, stdout, stderr *os.File, err error) {
+func (m *Manager) Start(ctx context.Context, name string, args, env []string, dir string) (stdin, stdout *os.File, err error) {
 	if m == nil {
-		return nil, nil, nil, fmt.Errorf("proc: Start called on nil Manager")
+		return nil, nil, fmt.Errorf("proc: Start called on nil Manager")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.started {
-		return nil, nil, nil, fmt.Errorf("proc: already started")
+		return nil, nil, fmt.Errorf("proc: already started")
 	}
 
 	// Append allowed-tools arguments if configured.
@@ -98,7 +98,7 @@ func (m *Manager) Start(ctx context.Context, name string, args, env []string, di
 	// Ensure work dir exists; create if missing.
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, nil, nil, fmt.Errorf("proc: mkdir workdir %s: %w", dir, err)
+			return nil, nil, fmt.Errorf("proc: mkdir workdir %s: %w", dir, err)
 		}
 	}
 
@@ -109,18 +109,18 @@ func (m *Manager) Start(ctx context.Context, name string, args, env []string, di
 	// Parent reads from r, writes to w. Subprocess reads from r, writes to w.
 	var stdinR, stdoutW, stderrW *os.File
 	if stdinR, m.stdin, err = os.Pipe(); err != nil {
-		return nil, nil, nil, fmt.Errorf("proc: stdin pipe: %w", err)
+		return nil, nil, fmt.Errorf("proc: stdin pipe: %w", err)
 	}
 	if m.stdout, stdoutW, err = os.Pipe(); err != nil {
 		_ = stdinR.Close()
 		_ = m.stdin.Close()
-		return nil, nil, nil, fmt.Errorf("proc: stdout pipe: %w", err)
+		return nil, nil, fmt.Errorf("proc: stdout pipe: %w", err)
 	}
 	if m.stderr, stderrW, err = os.Pipe(); err != nil {
 		_ = stdinR.Close()
 		_ = m.stdin.Close()
 		_ = m.stdout.Close()
-		return nil, nil, nil, fmt.Errorf("proc: stderr pipe: %w", err)
+		return nil, nil, fmt.Errorf("proc: stderr pipe: %w", err)
 	}
 
 	cmd.Stdin = stdinR
@@ -134,7 +134,7 @@ func (m *Manager) Start(ctx context.Context, name string, args, env []string, di
 		_ = m.stdin.Close()
 		_ = m.stdout.Close()
 		_ = m.stderr.Close()
-		return nil, nil, nil, fmt.Errorf("proc: start %s: %w", name, err)
+		return nil, nil, fmt.Errorf("proc: start %s: %w", name, err)
 	}
 
 	// Close parent's ends of subprocess stdin/stdout/stderr - subprocess inherited copies.
@@ -178,7 +178,7 @@ func (m *Manager) Start(ctx context.Context, name string, args, env []string, di
 	m.stderr = nil
 	go m.drainStderr(stderrPipe)
 
-	return m.stdin, m.stdout, nil, nil
+	return m.stdin, m.stdout, nil
 }
 
 // Terminate gracefully stops the process group and waits for shutdown.

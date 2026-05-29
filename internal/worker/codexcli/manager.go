@@ -319,7 +319,7 @@ func (m *CodexAppServerManager) startProcessLocked(ctx context.Context) error {
 	}
 	startCtx, startCancel := context.WithTimeout(ctx, startTimeout)
 	defer startCancel()
-	stdin, stdout, _, err := m.proc.Start(startCtx, binary, fullArgs, env, "")
+	stdin, stdout, err := m.proc.Start(startCtx, binary, fullArgs, env, "")
 	if err != nil {
 		m.proc = nil
 		m.state = stateIdle

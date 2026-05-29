@@ -173,7 +173,7 @@ func (w *ExecWorker) spawn(ctx context.Context, prompt string) error {
 	}
 	startCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	stdin, stdout, _, err := w.Proc.Start(startCtx, w.cfg.Command, args, env, session.ProjectDir)
+	stdin, stdout, err := w.Proc.Start(startCtx, w.cfg.Command, args, env, session.ProjectDir)
 	if err != nil {
 		w.Proc = nil
 		return fmt.Errorf("codexcli: start: %w", err)

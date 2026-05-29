@@ -194,7 +194,7 @@ func (w *Worker) startLocked(_ context.Context, session worker.SessionInfo, resu
 	fullArgs = append(fullArgs, args...)
 
 	bgCtx := context.Background()
-	stdin, _, _, err := w.Proc.Start(bgCtx, binary, fullArgs, base.BuildEnv(session, claudeCodeEnvBlocklist, "claude-code"), session.ProjectDir)
+	stdin, _, err := w.Proc.Start(bgCtx, binary, fullArgs, base.BuildEnv(session, claudeCodeEnvBlocklist, "claude-code"), session.ProjectDir)
 	if err != nil {
 		w.cleanupTempFiles()
 		w.Proc = nil
