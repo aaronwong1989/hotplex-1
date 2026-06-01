@@ -1120,7 +1120,9 @@ func (m *Manager) gc(ctx context.Context) {
 	})
 	_ = eg.Wait() // errors already logged inside goroutines
 
-	allIds := append(maxIds, idleIds...)
+	allIds := make([]string, 0, len(maxIds)+len(idleIds))
+	allIds = append(allIds, maxIds...)
+	allIds = append(allIds, idleIds...)
 	if len(allIds) > 0 {
 		eg2, egCtx2 := errgroup.WithContext(ctx)
 		eg2.SetLimit(5)
