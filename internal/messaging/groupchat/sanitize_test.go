@@ -85,7 +85,7 @@ func TestSanitizeContent(t *testing.T) {
 	t.Run("truncation applied", func(t *testing.T) {
 		content := strings.Repeat("a", 100)
 		filtered, reason := SanitizeContent(content, 50)
-		// 50 bytes of content + "\n" (1) + "…" (3 UTF-8 bytes) = 54
+		// Rune-aware truncation preserves whole characters; for ASCII, same byte count.
 		require.Len(t, filtered, 54)
 		require.Contains(t, filtered, "…")
 		require.Contains(t, reason, "truncated")
@@ -120,7 +120,7 @@ func TestExtractCodeBlocks(t *testing.T) {
 		blocks := extractCodeBlocks(content)
 		require.Len(t, blocks, 1)
 		require.Contains(t, blocks[0].src, "fmt.Println()")
-		require.Equal(t, "\x00CODEBLOCK\x00", blocks[0].placeholder)
+		require.Equal(t, "\x00CODEBLOCK1\x00", blocks[0].placeholder)
 	})
 
 	t.Run("multiple code blocks", func(t *testing.T) {

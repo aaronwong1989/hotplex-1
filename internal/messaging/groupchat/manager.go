@@ -104,6 +104,11 @@ func (m *Manager) StartDiscussion(ctx context.Context, ownerID, platform, channe
 		return "", fmt.Errorf("groupchat: need at least 2 bots, got %d", len(botNames))
 	}
 
+	// 1b. Validate topic length.
+	if maxLen := m.cfg.MaxTopicLength; maxLen > 0 && len([]rune(topic)) > maxLen {
+		return "", fmt.Errorf("groupchat: topic exceeds max length (%d/%d chars)", len([]rune(topic)), maxLen)
+	}
+
 	// 2. Resolve bot names to IDs.
 	var botIDs []string
 	botNamesMap := make(map[string]string)
@@ -138,7 +143,12 @@ func (m *Manager) StartDiscussion(ctx context.Context, ownerID, platform, channe
 	m.active[gs.ID] = run
 	m.mu.Unlock()
 
-	go m.runTurnLoop(runCtx, run)
+	// Snapshot sender before launching goroutine to avoid data race on m.sender.
+	m.mu.Lock()
+	senderSnapshot := m.sender
+	m.mu.Unlock()
+
+	go m.runTurnLoop(runCtx, run, senderSnapshot)
 
 	m.log.Info("groupchat: discussion started",
 		"group_id", gs.ID, "topic", topic, "bots", botNames, "owner", ownerID)
@@ -157,7 +167,14 @@ func (m *Manager) StopDiscussion(ctx context.Context, groupID string) error {
 	}
 
 	run.cancel()
-	return nil
+
+	// Wait for goroutine cleanup with timeout to prevent stale active sessions.
+	select {
+	case <-run.done:
+		return nil
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("groupchat: timed out waiting for discussion %s to stop", groupID)
+	}
 }
 
 // StopAll terminates all active discussions (gateway shutdown).
@@ -221,7 +238,7 @@ func (m *Manager) RepairRunningSessions(ctx context.Context) {
 // Turn Loop
 // ---------------------------------------------------------------------------
 
-func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
+func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun, sender ResponseSender) {
 	defer close(run.done)
 	defer m.cleanup(run)
 
@@ -234,7 +251,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 	})
 
 	// Send confirmation to platform.
-	_ = m.sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
+	_ = sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
 		fmt.Sprintf("🤝 讨论开始：%s（参与者：%s）", gs.Topic, formatBotList(gs)))
 
 	transcript := ""
@@ -245,7 +262,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 		// Check cancellation.
 		select {
 		case <-ctx.Done():
-			m.endDiscussion(ctx, gs, EndUserStopped)
+			m.endDiscussion(ctx, gs, EndUserStopped, sender)
 			return
 		default:
 		}
@@ -253,13 +270,13 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 		// Check termination conditions.
 		turns, _ := m.store.ListTurns(ctx, gs.ID)
 		if reason := m.guard.ShouldTerminate(ctx, gs, turns); reason != "" {
-			m.endDiscussion(ctx, gs, reason)
+			m.endDiscussion(ctx, gs, reason, sender)
 			return
 		}
 
 		// Select next speaker.
 		if len(participants) == 0 {
-			m.endDiscussion(ctx, gs, EndError)
+			m.endDiscussion(ctx, gs, EndError, sender)
 			return
 		}
 		speakerID := m.selector.Next(turnNum, participants)
@@ -285,7 +302,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 			if result.TimeoutCount > 0 {
 				turns, _ = m.store.ListTurns(ctx, gs.ID)
 				if m.guard.ShouldEvictBot(speakerID, turns) {
-					_ = m.sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
+					_ = sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
 						fmt.Sprintf("🚫 @%s 已从讨论中移除（连续超时）", speakerName))
 					participants = RemoveFromParticipants(participants, speakerID)
 					_ = m.store.RecordAudit(ctx, &AuditEvent{
@@ -294,7 +311,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 					})
 					continue
 				}
-				_ = m.sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
+				_ = sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
 					fmt.Sprintf("⏱️ @%s %ds 无回复 → 跳过本轮", speakerName, gs.TurnTimeoutSec))
 			}
 			_ = m.store.AppendTurn(ctx, result)
@@ -309,7 +326,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 		result.SanitizeReason = sanitizeReason
 
 		if sanitizeReason != "" {
-			_ = m.sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
+			_ = sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS,
 				fmt.Sprintf("🛡️ @%s 回复被安全过滤器处理 → %s", speakerName, sanitizeReason))
 		}
 
@@ -330,7 +347,7 @@ func (m *Manager) runTurnLoop(ctx context.Context, run *groupRun) {
 		select {
 		case <-time.After(m.cfg.Cooldown()):
 		case <-ctx.Done():
-			m.endDiscussion(ctx, gs, EndUserStopped)
+			m.endDiscussion(ctx, gs, EndUserStopped, sender)
 			return
 		}
 	}
@@ -510,7 +527,7 @@ func (m *Manager) extractResponse(ctx context.Context, sessionID string) string 
 	return content
 }
 
-func (m *Manager) endDiscussion(ctx context.Context, gs *GroupSession, reason EndReason) {
+func (m *Manager) endDiscussion(ctx context.Context, gs *GroupSession, reason EndReason, sender ResponseSender) {
 	_ = m.store.UpdateGroupState(ctx, gs.ID, GroupStateCompleted, reason)
 	_ = m.store.RecordAudit(ctx, &AuditEvent{
 		EventType: "discussion_end", SessionID: gs.ID,
@@ -534,7 +551,7 @@ func (m *Manager) endDiscussion(ctx context.Context, gs *GroupSession, reason En
 		endMsg = fmt.Sprintf("讨论结束（%s）", reason)
 	}
 
-	_ = m.sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS, endMsg)
+	_ = sender.SendControlMessage(ctx, gs.Platform, gs.ChannelID, gs.ThreadTS, endMsg)
 	m.log.Info("groupchat: discussion ended", "group_id", gs.ID, "reason", reason, "turns", gs.TurnCount)
 }
 

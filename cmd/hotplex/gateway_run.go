@@ -429,6 +429,9 @@ func runGateway(configPath string, devMode bool, stopCh <-chan struct{}) (err er
 			MaxTopicLength:        cfg.GroupChat.MaxTopicLength,
 			PoolReservation:       cfg.GroupChat.PoolReservation,
 		}
+		if err := gcCfg.Validate(); err != nil {
+			return fmt.Errorf("groupchat config: %w", err)
+		}
 		groupChatMgr = groupchat.NewManager(
 			log, gcCfg, gcStore,
 			bridge, sm,

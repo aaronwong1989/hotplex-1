@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS group_turns (
     turn_num INTEGER NOT NULL,
     content TEXT NOT NULL DEFAULT '',
     skipped INTEGER NOT NULL DEFAULT 0,
-    sanitized INTEGER NOT NULL DEFAULT 1,
+    sanitized INTEGER NOT NULL DEFAULT 0,
     sanitize_reason TEXT NOT NULL DEFAULT '',
     timeout_count INTEGER NOT NULL DEFAULT 0,
     cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0,

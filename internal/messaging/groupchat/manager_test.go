@@ -287,10 +287,9 @@ func TestManager_StopDiscussion(t *testing.T) {
 	require.NoError(t, m.StopDiscussion(ctx, groupID))
 
 	// Wait for cleanup.
-	time.Sleep(200 * time.Millisecond)
-
-	// Should no longer be active.
-	require.Nil(t, m.GetActiveForChannel("ch_1", ""))
+	require.Eventually(t, func() bool {
+		return m.GetActiveForChannel("ch_1", "") == nil
+	}, 2*time.Second, 50*time.Millisecond)
 }
 
 func TestManager_StopDiscussion_NotActive(t *testing.T) {
