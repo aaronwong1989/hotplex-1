@@ -194,4 +194,5 @@ pool.UpdateLimits(newMaxSize, newMaxIdlePerUser)
 
 ## 延伸阅读
 
+- [GroupChat 多 Bot 协作流程](../../architecture/GroupChat-Collaboration-Flow.md) — 多 Bot 群聊讨论的完整流程、安全过滤与 Mermaid 流程图
 - [Session 生命周期](../../explanation/session-lifecycle.md) — 5 状态机、UUIDv5 Key 派生、GC 策略的设计原理
